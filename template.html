@@ -1,0 +1,81 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Token</title>
+    <meta name="description" content="kunsul">
+    <meta name="author" content="Chris Fordham">
+    <style type="text/css">
+        body,html { height: 100%; width: 100%; background-color:#e0f0f0;  }
+
+        h1,h2,h3{  margin: 0; padding: 0; color:#334455  }
+        h1 { border-bottom: 1px dotted #ccddee; padding: 20px;  font-size: 3em; }
+        h2 { padding: 30px; font-size: 2em; }
+        h3 {font-size: 0.9em;  }
+        h3 span{  color:#556677; font-weight: normal; }
+        a { color: #225577;  }
+        a:hover { color: #5588aa; }
+
+        .page-header ,
+        .page-body,
+        .page-footer{ width: 780px; margin: auto;   }
+
+        .page-header{ margin-bottom: 20px;}
+        .page-footer{ margin-bottom: 20px;}
+        .page-body{ border: 20px solid #d0f0f0; background-color: #e8f8f8; padding-bottom: 40px; }
+
+
+        .clear-float{ clear:both;}
+
+
+        .center{ text-align: center}
+
+        .message{ position: relative;}
+        .message .alert{ color:red; font-size:1.5em; }
+        .message .caption{ font-size: 0.8em; top:-6px; position: relative;  }
+
+        textarea{ width: 80%; height: 300px; padding: 20px; margin: auto; border: 0; background: transparent; display: block; }
+    </style>
+
+    <script type="text/javascript">
+        function copyToClipboard(field) {
+            var copyText = document.getElementById(field.id);
+            copyText.select();
+            document.execCommand("copy");
+            alert("Copied the token to the clipboard");
+        }
+    </script>
+</head>
+
+<body>
+
+<div class="page-header" >
+    <h1></h1>
+</div>
+
+<div class="page-body" >
+    <h2>Token</h2>
+
+    <textarea id="access-token" onclick="copyToClipboard(this)">
+        {{.AccessToken}}
+    </textarea>
+
+
+    <div class="message center">
+        Inspect this JWT through <a href="https://jwt.io/" target="_blank">https://jwt.io/</a>
+    </div>
+
+    <div class="clear-float"></div>
+</div>
+
+<div class="page-footer" >
+    <h1></h1>
+</div>
+
+
+</body>
+
+</html>
