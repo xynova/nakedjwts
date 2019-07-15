@@ -1,12 +1,20 @@
 package main
 
 import (
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
+	log "github.com/sirupsen/logrus"
 )
 
 
@@ -54,5 +62,55 @@ func randString() string {
 	buf := make([]byte, 32)
 	rand.Read(buf)
 	return base64.StdEncoding.EncodeToString(buf)
+}
+
+func getPrivateKey(path string) (crypto.PrivateKey, error) {
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil ,err
+	}
+	block, _ := pem.Decode(bytes)
+	if block == nil {
+		return nil, errors.New("failed to parse PEM block containing the key")
+	}
+
+
+	parsedKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsedKey, nil
+}
+
+func getPublicKey(path string) (crypto.PublicKey, error) {
+
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil ,err
+	}
+	block, _ := pem.Decode(bytes)
+	if block == nil {
+		return nil, errors.New("failed to parse PEM block containing the key")
+	}
+
+	parsedKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	switch parsedKey.(type) {
+	case *rsa.PublicKey:
+		return parsedKey, nil
+	default:
+		break // fall through
+	}
+	return nil, errors.New("Key type is not RSA")
+}
+
+
+func writeErrorResponse(w http.ResponseWriter, e error, code int  ){
+	log.Errorf("Cannot marshal Json %s", e)
+	http.Error(w, fmt.Sprintf("%s",e), code)
 }
 

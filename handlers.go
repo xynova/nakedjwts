@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"github.com/Masterminds/sprig"
 	"golang.org/x/oauth2"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 	"net/http"
 	"os"
 	"path"
@@ -26,12 +29,12 @@ func (s *serviceConfig) rootHandler(w http.ResponseWriter, r *http.Request) {
 	oauthState := randString()
 	log.Debugf("oauthState: %s", oauthState)
 	loginUrl := s.oauth2.AuthCodeURL(oauthState, oauth2.AccessTypeOnline)
-	cypherBytes, err := encrypt(s.stateKey, []byte (oauthState))
+	cypherBytes, err := encrypt(s.stateEncKey, []byte (oauthState))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	expire := time.Now().Add(s.loginWindow)
+	expire := time.Now().Add(s.maxLoginWindow)
 	cookie := http.Cookie{
 		Name:"baggage",
 		Value: base64.StdEncoding.EncodeToString(cypherBytes),
@@ -44,7 +47,7 @@ func (s *serviceConfig) rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func (s *serviceConfig) renderToken(w http.ResponseWriter, r *http.Request) {
+func (s *serviceConfig) renderTokenHandler(w http.ResponseWriter, r *http.Request) {
 	//defer wg.Done()
 
 	cookie,err := r.Cookie("baggage")
@@ -59,7 +62,7 @@ func (s *serviceConfig) renderToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oauthStateBytes, err := decrypt(s.stateKey,decodedValue )
+	oauthStateBytes, err := decrypt(s.stateEncKey,decodedValue )
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Cannot decrypt baggage"), http.StatusUnauthorized)
 		return
@@ -99,7 +102,7 @@ func (s *serviceConfig) renderToken(w http.ResponseWriter, r *http.Request) {
 
 	var tmplPath = path.Join(configDir,templateName)
 	if tmpl, err = template.New(templateName).Funcs(sprig.FuncMap()).ParseFiles(tmplPath); err != nil {
-		writeHtmlErrorResponse(w,err)
+		writeErrorResponse(w,err,http.StatusInternalServerError)
 		return
 	}
 	log.Debugf("TEMPLATES:>  %s", tmpl.DefinedTemplates())
@@ -108,16 +111,90 @@ func (s *serviceConfig) renderToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := tmpl.Execute(w, pageData); err != nil {
-		writeHtmlErrorResponse(w,err)
+		writeErrorResponse(w,err,http.StatusInternalServerError)
 		return
 	}
 
 }
 
-func writeHtmlErrorResponse(w http.ResponseWriter, e error ){
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte(e.Error()))
-	return
+
+
+func (s *serviceConfig) jwksHandler(w http.ResponseWriter, r *http.Request) {
+	pub := jose.JSONWebKey{
+		Key: s.pubKey,
+		Use: "sig",
+		Algorithm: "RS256",
+		KeyID: "default",
+	}
+
+	keyset := &jose.JSONWebKeySet{ Keys: []jose.JSONWebKey{ pub } }
+	rt, err := json.Marshal(keyset)
+	if err != nil {
+		writeErrorResponse(w,err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/json")
+	w.Write(rt)
 }
 
+
+
+func (s * serviceConfig) jwtTokenHandler(w http.ResponseWriter, r *http.Request) {
+	// create Square.jose signing key
+	key := jose.SigningKey{Algorithm: jose.RS256, Key: s.privKey}
+
+	// create a Square.jose RSA signer, used to sign the JWT
+	var signerOpts= jose.SignerOptions{}
+	signerOpts.WithType("JWT")
+	rsaSigner, err := jose.NewSigner(key, &signerOpts)
+	if err != nil {
+		log.Fatalf("failed to create signer:%+v", err)
+	}
+
+	// create an instance of Builder that uses the rsa signer
+	builder := jwt.Signed(rsaSigner)
+
+
+	// create an instance of the CustomClaim
+	customClaims := CustomClaims{
+		Claims: &jwt.Claims{
+			Issuer:   "http://192.168.1.11:5000/",
+			Subject:  "hector.maldonado@subabank.com",
+			ID:       "id1",
+			Audience: jwt.Audience{r.Host},
+			IssuedAt:
+			jwt.NewNumericDate(time.Now().UTC()),
+			Expiry:
+			jwt.NewNumericDate(time.Date(2019, 8, 1, 0, 8, 0, 0, time.UTC)),
+		},
+		PrivateClaim1: "val1",
+		PrivateClaim2: []string{"val2", "val3"},
+		AnyJSONObjectClaim: map[string]interface{}{
+			"name": "john",
+			"phones": map[string]string{
+				"phone1": "123",
+				"phone2": "456",
+			},
+		},
+	}
+	// add claims to the Builder
+	builder = builder.Claims(customClaims)
+
+	// validate all ok, sign with the RSA key, and return a compact JWT
+	rt, err := builder.CompactSerialize()
+	if err != nil {
+		log.Fatalf("failed to create JWT:%+v", err)
+	}
+
+	w.Header().Set("Content-Type", "text/json")
+	w.Write([]byte(rt))
+}
+
+
+type CustomClaims struct {
+	*jwt.Claims
+	PrivateClaim1 string   `json:"privateClaim1,omitempty"`
+	PrivateClaim2 []string `json:"privateClaim2,omitEmpty"`
+	AnyJSONObjectClaim map[string]interface{} `json:"anyJSONObjectClaim"`
+}

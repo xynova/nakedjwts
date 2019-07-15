@@ -8,16 +8,6 @@ import (
 	"os"
 )
 
-type Scopes []string
-
-func (s *Scopes) String() string {
-	return fmt.Sprintf("%s", *s)
-}
-
-func (s *Scopes) Set(value string) error {
-	*s = append(*s, value)
-	return nil
-}
 
 
 
@@ -34,10 +24,14 @@ func main() {
 	http.HandleFunc("/", config.rootHandler)
 
 
-	http.HandleFunc(config.redirectUrl.Path, config.renderToken )
+	http.HandleFunc(config.redirectUrl.Path, config.renderTokenHandler)
+
+	http.HandleFunc("/.well-known/jwks.json", config.jwksHandler )
+
+	http.HandleFunc("/jwt", config.jwtTokenHandler)
 
 	server := http.Server{
-		Addr: fmt.Sprintf("0.0.0.0:%d", config.servePort),
+		Addr: fmt.Sprintf("0.0.0.0:%d", config.sericePort),
 	}
 
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {

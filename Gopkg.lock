@@ -126,9 +126,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:39628c44b67004cdd7ff753f6490588b87defe2569413378719d7e4f92df352d"
+  digest = "1:c325db3fc913eb4af64591d203b58d1449b89e91ade3b2914e0655922d9b8d8e"
   name = "golang.org/x/crypto"
   packages = [
+    "ed25519",
+    "ed25519/internal/edwards25519",
     "pbkdf2",
     "scrypt",
   ]
@@ -211,6 +213,19 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:9593bab40e981b1f90b7e07faeab0d09b75fe338880d08880f986a9d3283c53f"
+  name = "gopkg.in/square/go-jose.v2"
+  packages = [
+    ".",
+    "cipher",
+    "json",
+    "jwt",
+  ]
+  pruneopts = "UT"
+  revision = "730df5f748271903322feb182be83b43ebbbe27d"
+  version = "v2.3.1"
+
+[[projects]]
   branch = "v2"
   digest = "1:73e6fda93622790d2371344759df06ff5ff2fac64a6b6e8832b792e7402956e7"
   name = "gopkg.in/yaml.v2"
@@ -229,6 +244,8 @@
     "github.com/onsi/gomega/ghttp",
     "github.com/sirupsen/logrus",
     "golang.org/x/oauth2",
+    "gopkg.in/square/go-jose.v2",
+    "gopkg.in/square/go-jose.v2/jwt",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

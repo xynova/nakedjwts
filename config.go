@@ -1,21 +1,36 @@
 package main
 
 import (
+	"crypto"
 	"flag"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"net/url"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 type serviceConfig struct {
-	oauth2 *oauth2.Config
-	stateKey []byte
-	loginWindow time.Duration
-	servePort int
-	redirectUrl url.URL
+	oauth2         *oauth2.Config
+	stateEncKey    []byte
+	maxLoginWindow time.Duration
+	sericePort     int
+	redirectUrl    url.URL
+	privKey crypto.PrivateKey
+	pubKey crypto.PublicKey
 }
 
+
+
+//type Scopes []string
+//
+//func (s *Scopes) String() string {
+//	return fmt.Sprintf("%s", *s)
+//}
+//
+//func (s *Scopes) Set(value string) error {
+//	*s = append(*s, value)
+//	return nil
+//}
 
 
 func getConfig() ( *serviceConfig, error){
@@ -28,11 +43,11 @@ func getConfig() ( *serviceConfig, error){
 		tokenUrlFlag     = flag.String("token-url", "https://localhost/oauth2/token", "Token URL")
 		loginWindowFlag  = flag.Duration("login-window", 30 * time.Second, "Max time allowed for login to happen. eg: 30s")
 		debugFlag        = flag.Bool("debug", false, "Turn verbose logs on")
-		scopesFlag       Scopes
+		//scopesFlag       Scopes
 	)
 
 
-	flag.Var(&scopesFlag, "scope", "oAuth scopesFlag to authorize (can be specified multiple times")
+	//flag.Var(&scopesFlag, "scope", "oAuth scopesFlag to authorize (can be specified multiple times")
 	flag.Parse()
 
 
@@ -44,26 +59,45 @@ func getConfig() ( *serviceConfig, error){
 	redirectUrl,err := url.Parse(*redirectUrlFlag)
 	if err != nil{
 		log.Fatalf("Cannot parse url %s", *redirectUrl)
+		return nil, err
 	}
+
+
+	privKey , err :=  getPrivateKey("./ignore.key.priv")
+	if err != nil{
+		log.Fatalf("Cannot parse private key: %s", err)
+		return nil, err
+	}
+
+	pubKey , err :=  getPublicKey("./ignore.key.pub")
+	if err != nil{
+		log.Fatalf("Cannot public key %s", err)
+		return nil, err
+	}
+
+
 
 	rt := &serviceConfig{
 
 		oauth2: &oauth2.Config{
 			ClientID:     *clientIdFlag,
 			ClientSecret: *clientSecretFlag,
-			Scopes:       scopesFlag,
+			//Scopes:       scopesFlag,
 			RedirectURL:  redirectUrl.String(),
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  *authorizeUrlFlag,
 				TokenURL: *tokenUrlFlag,
 			},
 		},
-		stateKey: []byte("a very very very very secret key"), // 32 bytes
-		servePort: *portFlag,
-		loginWindow: *loginWindowFlag,
-		redirectUrl: *redirectUrl,
+		stateEncKey:    []byte("a very very very very secret key"), // 32 bytes
+		sericePort:     *portFlag,
+		maxLoginWindow: *loginWindowFlag,
+		redirectUrl:    *redirectUrl,
+		pubKey: pubKey,
+		privKey: privKey,
 	}
 
 
 	return rt, nil
 }
+
