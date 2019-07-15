@@ -16,4 +16,4 @@
 /vendor/
 /Godeps/
 
-*.ignore.*
+**/ignore.*

@@ -1,12 +1,14 @@
 FROM golang as builder
-COPY . /go/src/github.com/xynova/nakedToken
-WORKDIR /go/src/github.com/xynova/nakedToken
-RUN go get ./... && \
-    CGO_ENABLED=0 GOOS=linux go build -o /nakedToken main.go
+COPY . /go/src/github.com/xynova/nakedjwt
+WORKDIR /go/src/github.com/xynova/nakedjwt
+RUN go get -u github.com/golang/dep/cmd/dep \
+    && dep ensure
+RUN CGO_ENABLED=0 GOOS=linux go build -o /nakedjwt .
 
 FROM gcr.io/distroless/static
-COPY --from=builder /nakedToken /nakedToken
+COPY --from=builder /nakedjwt /nakedjwt
 COPY template.html /template.html
 WORKDIR /
-ENTRYPOINT ["./nakedToken"]
-#CMD ["--config-dir", "/etc/kunsul", "--template" , "template.html"]
+ENTRYPOINT ["./nakedjwt"]
+USER nobody:nobody
+#CMD ["--config-dir", "/etc/nakedtoken", "--template" , "template.html"]
