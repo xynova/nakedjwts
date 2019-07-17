@@ -11,21 +11,16 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"html/template"
 	"net/http"
-	"os"
 	"path"
 	"time"
 )
 
 
 
-type pageData struct {
-	AccessToken string
-	SurrogateToken string
-}
 
 
 
-func OauthLoginInitHandler(flowConfig *OauthFlowConfig ,cookieConfig *StateCookieConfig) HandlerFunc{
+func OauthLoginInitHandler(flowConfig *OauthFlowConfig ,cookieConfig *StateCookieConfig) http.HandlerFunc{
 	return func (w http.ResponseWriter, r *http.Request) {
 		oauthState := randString()
 		log.Debugf("oauthState: %s", oauthState)
@@ -49,12 +44,13 @@ func OauthLoginInitHandler(flowConfig *OauthFlowConfig ,cookieConfig *StateCooki
 }
 
 
-func OauthLoginCallbackHandler(flowConfig *OauthFlowConfig, cookieConfig *StateCookieConfig, next HandlerFunc) HandlerFunc{
+func OauthLoginCallbackHandler(flowConfig *OauthFlowConfig, cookieConfig *StateCookieConfig, next http.HandlerFunc) http.HandlerFunc{
 
 	return func (w http.ResponseWriter, r *http.Request) {
 		cookie,err := r.Cookie(cookieConfig.Name)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("%s", err), http.StatusBadRequest)
+			log.Debug("Cookie for state not present")
+			http.Redirect(w, r, cookieConfig.Path,http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -114,16 +110,14 @@ func OauthLoginCallbackHandler(flowConfig *OauthFlowConfig, cookieConfig *StateC
 
 
 
-func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *StateCookieConfig) HandlerFunc {
-
-
+func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *StateCookieConfig) http.HandlerFunc {
 
 	return func (w http.ResponseWriter, r *http.Request) {
 
-
 		cookie,err := r.Cookie(cookieConfig.Name)
 		if err != nil {
-			http.Redirect(w, r, "/",http.StatusTemporaryRedirect)
+			log.Debug("Cookie for identityToken not present")
+			http.Redirect(w, r, cookieConfig.Path,http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -144,7 +138,13 @@ func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *State
 		log.Debugf("accessToken from cookie: %s", accessToken)
 
 
-		expires := time.Date(2019, 8, 1, 0, 8, 0, 0, time.UTC)
+		expires, err := BeginningOfMonth("Australia/Sydney")
+		expires = time.Date(expires.Year(), expires.Month() + 1 , expires.Day(), 0,0,0,0, expires.Location())
+		if err != nil {
+			writeErrorResponse(w, "Failed to parse timezone", err, http.StatusInternalServerError)
+			return
+		}
+
 		claims, err := parseIdentityClaimsFromToken(accessToken)
 		if err != nil {
 			writeErrorResponse(w, "Failed to get claims", err, http.StatusInternalServerError)
@@ -161,17 +161,16 @@ func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *State
 		pageData := pageData{
 			AccessToken: accessToken,
 			SurrogateToken:surrogateToken,
+			SurrogateExpires: expires,
 		}
 
 
 		var tmpl *template.Template
 
 
-		//t := template.New("base").Funcs(sprig.FuncMap()).ParseFiles("template.html")
-		templateName := "template.html"
-		configDir, _ := os.Getwd()
-
-		var tmplPath = path.Join(configDir,templateName)
+		//t := template.New("base").Funcs(sprig.FuncMap()).ParseFiles("display-token.html")
+		templateName := "display-token.html"
+		var tmplPath = path.Join(flowConfig.ConfigDir,templateName)
 		if tmpl, err = template.New(templateName).Funcs(sprig.FuncMap()).ParseFiles(tmplPath); err != nil {
 			writeErrorResponse(w, "Cannot parse template", err,http.StatusInternalServerError)
 			return
@@ -200,7 +199,7 @@ func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *State
 
 
 
-func RenderJwksHandler(flowConfig *SigningFlowConfig) HandlerFunc{
+func RenderJwksHandler(flowConfig *SigningFlowConfig) http.HandlerFunc{
 
 	return func (w http.ResponseWriter, r *http.Request) {
 		jswk := jose.JSONWebKey{

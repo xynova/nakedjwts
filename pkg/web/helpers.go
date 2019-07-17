@@ -125,8 +125,8 @@ func createSurrogateToken(flowConfig *SigningFlowConfig, claims *identityClaims,
 	customClaims := surrogateJwtClaims{
 		Claims: &jwt.Claims{
 			//ID:       "id1",
-			Issuer:   flowConfig.Issuer,
-			Audience: jwt.Audience{ flowConfig.Audience },
+			Issuer:   strings.TrimSuffix(flowConfig.Issuer.String(),"/") + "/",
+			Audience: jwt.Audience(flowConfig.Audiences),
 			Subject:  claims.Subject,
 			IssuedAt: jwt.NewNumericDate(time.Now().UTC()),
 			Expiry: jwt.NewNumericDate(expires),
@@ -134,6 +134,7 @@ func createSurrogateToken(flowConfig *SigningFlowConfig, claims *identityClaims,
 		Email: claims.Email,
 		Name: claims.Name,
 	}
+
 
 	rt, err := jwt.Signed(rsaSigner).Claims(customClaims).CompactSerialize()
 	if err != nil {
@@ -173,4 +174,18 @@ func parseIdentityClaimsFromToken( jwtToken string) (*identityClaims, error){
 	}
 
 	return claims, nil
+}
+
+
+func BeginningOfMonth(tz string) (time.Time, error) {
+
+	//y, m, _ := time.Now().Date()
+	location, err:= time.LoadLocation(tz)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	t := time.Now().In(location)
+
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, location), nil
 }

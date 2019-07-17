@@ -7,8 +7,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /nakedjwt .
 
 FROM gcr.io/distroless/static
 COPY --from=builder /nakedjwt /nakedjwt
-COPY template.html /template.html
+COPY display-token.html /template.html
 WORKDIR /
 ENTRYPOINT ["./nakedjwt"]
 USER nobody:nobody
-#CMD ["--config-dir", "/etc/nakedtoken", "--template" , "template.html"]
+CMD ["--config-dir", "/etc/nakedjwt"]
