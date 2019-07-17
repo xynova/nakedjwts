@@ -194,7 +194,6 @@ func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *State
 			Path: cookieConfig.Path,
 		}
 		http.SetCookie(w, &oauthCookie)
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0")
 
 	}
 }
