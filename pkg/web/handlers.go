@@ -22,6 +22,8 @@ import (
 
 func OauthLoginInitHandler(flowConfig *OauthFlowConfig ,cookieConfig *StateCookieConfig) http.HandlerFunc{
 	return func (w http.ResponseWriter, r *http.Request) {
+		log.Debugf("currentPath:" ,r.URL)
+
 		oauthState := randString()
 		log.Debugf("oauthState: %s", oauthState)
 		loginUrl := flowConfig.Oauth2.AuthCodeURL(oauthState, oauth2.AccessTypeOnline)
@@ -30,12 +32,12 @@ func OauthLoginInitHandler(flowConfig *OauthFlowConfig ,cookieConfig *StateCooki
 			log.Fatal(err)
 		}
 
-		expire := time.Now().Add(flowConfig.MaxLoginWindow)
 		cookie := http.Cookie{
 			Name: cookieConfig.Name,
 			Value: base64.StdEncoding.EncodeToString(cypherBytes),
 			Domain: r.Host,
-			Expires: expire,
+			Expires: time.Now().Add(flowConfig.MaxLoginWindow),
+			Path: cookieConfig.Path,
 		}
 
 		http.SetCookie(w, &cookie)
@@ -47,6 +49,8 @@ func OauthLoginInitHandler(flowConfig *OauthFlowConfig ,cookieConfig *StateCooki
 func OauthLoginCallbackHandler(flowConfig *OauthFlowConfig, cookieConfig *StateCookieConfig, next http.HandlerFunc) http.HandlerFunc{
 
 	return func (w http.ResponseWriter, r *http.Request) {
+		log.Debugf("currentPath:" ,r.URL)
+
 		cookie,err := r.Cookie(cookieConfig.Name)
 		if err != nil {
 			log.Debug("Cookie for state not present")
@@ -94,13 +98,12 @@ func OauthLoginCallbackHandler(flowConfig *OauthFlowConfig, cookieConfig *StateC
 			return
 		}
 
-		expire := time.Now().Add(2 * time.Second)
 		oauthCookie := http.Cookie{
 			Name: cookieConfig.Name,
 			Value: base64.StdEncoding.EncodeToString(cypherBytes),
 			Domain: r.Host,
-			Expires: expire,
-			Path: "/",
+			Expires: time.Now().Add(2 * time.Second),
+			Path: cookieConfig.Path,
 		}
 		http.SetCookie(w, &oauthCookie)
 		next(w, r)
@@ -113,6 +116,7 @@ func OauthLoginCallbackHandler(flowConfig *OauthFlowConfig, cookieConfig *StateC
 func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *StateCookieConfig) http.HandlerFunc {
 
 	return func (w http.ResponseWriter, r *http.Request) {
+		log.Debugf("currentPath:" ,r.URL)
 
 		cookie,err := r.Cookie(cookieConfig.Name)
 		if err != nil {
@@ -183,14 +187,14 @@ func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *State
 			return
 		}
 
-		expire := time.Now()
 		oauthCookie := http.Cookie{
 			Name: cookieConfig.Name,
 			Domain: r.Host,
-			Expires: expire,
-			Path: "/",
+			Expires: time.Now(),
+			Path: cookieConfig.Path,
 		}
 		http.SetCookie(w, &oauthCookie)
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0")
 
 	}
 }
@@ -202,6 +206,8 @@ func RenderSurrogateJwtHandler(flowConfig *SigningFlowConfig,cookieConfig *State
 func RenderJwksHandler(flowConfig *SigningFlowConfig) http.HandlerFunc{
 
 	return func (w http.ResponseWriter, r *http.Request) {
+		log.Debugf("currentPath:" ,r.URL)
+
 		jswk := jose.JSONWebKey{
 			Key: flowConfig.PrivateKey.Public(),
 			Use: "sig",
