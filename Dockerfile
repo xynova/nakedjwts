@@ -1,4 +1,7 @@
-FROM local/golang-dep as builder
+FROM golang as godep
+RUN go get -u github.com/golang/dep/cmd/dep
+
+FROM godep as builder
 COPY . /go/src/github.com/xynova/nakedjwts
 WORKDIR /go/src/github.com/xynova/nakedjwts
 RUN dep ensure

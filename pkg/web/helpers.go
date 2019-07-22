@@ -153,14 +153,14 @@ func parseIdentityClaimsFromToken( jwtToken string) (*identityClaims, error){
 		return nil, errors.New("Invalid JWT token")
 	}
 
-	data, err := base64.StdEncoding.DecodeString(parts[1])
+	data, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, errorFrom(err, "Failed to decode JWT")
+		return nil, errorFrom(err, "Failed to base64 decode JWT claims section")
 	}
 
 	claims := &identityClaims{}
 	if json.Unmarshal(data, claims) != nil {
-		return nil, errorFrom(err, "Failed to decode JWT")
+		return nil, errorFrom(err, "Failed to decode claims")
 	}
 
 	// Fix subject if it is an azure token
