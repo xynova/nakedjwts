@@ -1,11 +1,7 @@
 package web
 
 import (
-	"crypto/rsa"
-	"golang.org/x/oauth2"
-	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
-	"net/url"
 	"time"
 )
 
@@ -23,21 +19,6 @@ type StateCookieConfig struct {
 	Path 	string
 }
 
-type OauthFlowConfig struct {
-	Oauth2            *oauth2.Config
-	ClientCallbackUrl *url.URL
-	MaxLoginWindow    time.Duration
-}
-
-
-type SigningFlowConfig struct{
-	SigningAlgorithm  jose.SignatureAlgorithm
-	PrivateKey 	*rsa.PrivateKey
-	KeyId	string
-	Audiences []string
-	Issuer *url.URL
-	ConfigDir string
-}
 
 type surrogateJwtClaims struct {
 	*jwt.Claims

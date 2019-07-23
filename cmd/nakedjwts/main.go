@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/xynova/nakedjwts/pkg/cookies"
 	"github.com/xynova/nakedjwts/pkg/web"
 	"golang.org/x/oauth2"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -54,8 +55,22 @@ func configureServeCommand(app *kingpin.Application) {
 			err   error
 		)
 
+
+		privateKey, err := web.ReadRsaPrivateKey(*surrogateKeyPath)
+		if err != nil {
+			return err
+		}
+
+
+		cookieSetter := &cookies.EncryptedSetter{
+			Name: "baggage",
+			Key: privateKey,
+			Path: path.Join("/",*httpBasePath),
+		}
+
 		// Configure oauth login handling funcs
 		oauthFlow := &web.OauthFlowConfig{
+			StateCookie:       cookieSetter,
 			MaxLoginWindow:    *idLoginWindow,
 			ClientCallbackUrl: *clientCallbackUrl,
 			Oauth2: &oauth2.Config{
@@ -72,49 +87,49 @@ func configureServeCommand(app *kingpin.Application) {
 
 
 		// Configure surrogate token funcs
-		privateKey, err := web.ReadRsaPrivateKey(*surrogateKeyPath)
-		if err != nil {
-			return err
-		}
+
 		signingFlow := &web.SigningFlowConfig{
+			StateCookie:      cookieSetter,
 			SigningAlgorithm: jose.RS256,
-			PrivateKey: privateKey,
-			KeyId: "local-default",
-			Audiences: *surrogateAudiences,
-			Issuer: *surrogateIssuerUrl,
-			ConfigDir: *configDir,
+			PrivateKey:       privateKey,
+			KeyId:            "local-default",
+			Audiences:        *surrogateAudiences,
+			Issuer:           *surrogateIssuerUrl,
+			ConfigDir:        *configDir,
 		}
 
 
-		stateCookieConfig := &web.StateCookieConfig{
-			Name:   "baggage",
-			EncKey: []byte("a very very very very secret key"), // 32 bytes
-			Path: path.Join("/",*httpBasePath),
-		}
+		//stateCookieConfig := &web.StateCookieConfig{
+		//	Name:   "baggage",
+		//	EncKey: []byte("a very very very very secret key"), // 32 bytes
+		//	Path: path.Join("/",*httpBasePath),
+		//}
+
+
 
 
 
 		router := mux.NewRouter()
-		displayTokenPath := path.Join(stateCookieConfig.Path,"display-token")
+		displayTokenPath := path.Join(cookieSetter.Path,"display-token")
 
 		// Starts teh oauth login flow
-		hFunc = web.OauthLoginInitHandler(oauthFlow, stateCookieConfig)
-		router.HandleFunc(stateCookieConfig.Path, hFunc).Methods("GET")
-		router.HandleFunc(stateCookieConfig.Path + "/", hFunc).Methods("GET")
+		hFunc = oauthFlow.LoginInitHandle()
+		router.HandleFunc(cookieSetter.Path, hFunc).Methods("GET")
+		router.HandleFunc(cookieSetter.Path + "/", hFunc).Methods("GET")
 
 		// Handles the oauth id provider callback code
 		displayTokenRedirect := func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, displayTokenPath,http.StatusTemporaryRedirect)
 		}
-		hFunc = web.OauthLoginCallbackHandler(oauthFlow ,stateCookieConfig, displayTokenRedirect)
+		hFunc = oauthFlow.LoginCallbackHandle(displayTokenRedirect)
 		router.HandleFunc(oauthFlow.ClientCallbackUrl.Path, hFunc).Methods("GET")
 
 		// Generates surrogate token
-		hFunc =  web.RenderSurrogateJwtHandler(signingFlow, stateCookieConfig)
+		hFunc =  signingFlow.RenderSurrogateJwtHandle()
 		router.HandleFunc(displayTokenPath, hFunc).Methods("GET")
 
 		// Displays the jwks public key for the surrogate token validation
-		hFunc = web.RenderJwksHandler(signingFlow)
+		hFunc = signingFlow.RenderJwksHandle()
 		router.HandleFunc("/{base:.*}.well-known/jwks.json", hFunc).Methods("GET")
 
 
