@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/ovh/configstore"
 	"github.com/ovh/symmecrypt/keyloader"
-	"path"
+	"github.com/xynova/nakedjwts/pkg/web"
 	"testing"
 )
 
@@ -63,12 +63,12 @@ func TestChallengeRequested(t *testing.T) {
 
 
 func TestSomethingElse(t *testing.T) {
-	h := sha256.New()
-	h.Write([]byte("hello world\n"))
-	sum := h.Sum(nil)
-	//fmt.Printf("%x", h.Sum(nil))
-	fmt.Print(len(sum))
+	privateKey, _ := web.ReadRsaPrivateKey("../../ignore.key.priv")
 
-	fmt.Print(path.Join("/etc/token","display-token.html"))
+	h := sha256.New()
+	h.Write(privateKey.D.Bytes())
+	sum := h.Sum(nil)
+	fmt.Printf("%x \n", h.Sum(nil))
+	fmt.Printf("%v \n", len(sum))
 
 }
