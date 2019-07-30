@@ -12,19 +12,21 @@ import (
 	"time"
 )
 
-
-type EncryptedSetter struct {
-	Name   	string
-	Key		*rsa.PrivateKey
-	Path 	string
-}
-
 var (
 	encKey = []byte("a very very very very secret key") // 32 bytes
 	CookieNotFoundError = errors.New("Cookie not found present")
 )
 
-func (c *EncryptedSetter) SetValue(value string, expires time.Time, domain string, w http.ResponseWriter) error {
+
+type Encrypted struct {
+	Name   	string
+	Key		*rsa.PrivateKey
+	Path 	string
+}
+
+
+
+func (c *Encrypted) SetValue(value string, expires time.Time, domain string, w http.ResponseWriter) error {
 
 	cypherBytes, err := encryptBytes(encKey, []byte (value))
 	if err != nil {
@@ -44,7 +46,7 @@ func (c *EncryptedSetter) SetValue(value string, expires time.Time, domain strin
 }
 
 
-func (c *EncryptedSetter) GetValue(r *http.Request) (string,error) {
+func (c *Encrypted) GetValue(r *http.Request) (string,error) {
 
 	cookie,err := r.Cookie(c.Name)
 	if err != nil {

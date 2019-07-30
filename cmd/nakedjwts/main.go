@@ -62,7 +62,7 @@ func configureServeCommand(app *kingpin.Application) {
 		}
 
 
-		cookieSetter := &cookies.EncryptedSetter{
+		cookieSetter := &cookies.Encrypted{
 			Name: "baggage",
 			Key: privateKey,
 			Path: path.Join("/",*httpBasePath),
@@ -97,15 +97,6 @@ func configureServeCommand(app *kingpin.Application) {
 			Issuer:           *surrogateIssuerUrl,
 			ConfigDir:        *configDir,
 		}
-
-
-		//stateCookieConfig := &web.StateCookieConfig{
-		//	Name:   "baggage",
-		//	EncKey: []byte("a very very very very secret key"), // 32 bytes
-		//	Path: path.Join("/",*httpBasePath),
-		//}
-
-
 
 
 

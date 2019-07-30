@@ -2,14 +2,18 @@ FROM golang as godep
 RUN go get -u github.com/golang/dep/cmd/dep
 
 FROM godep as builder
-COPY . /go/src/github.com/xynova/nakedjwts
+ENV CGO_ENABLED=0
 WORKDIR /go/src/github.com/xynova/nakedjwts
-RUN dep ensure
-RUN CGO_ENABLED=0 GOOS=linux go build -o /nakedjwt cmd/nakedjwts/main.go
+COPY Gopkg.toml Gopkg.lock ./
+RUN dep ensure --vendor-only
+COPY . .
+RUN cd cmd/nakedjwts \
+    &&  go build -o /out/nakedjwts .
+
 
 FROM gcr.io/distroless/static
-COPY --from=builder /nakedjwt /nakedjwt
-COPY display-token.html /etc/nakedjwt/
+COPY --from=builder /out/nakedjwts /nakedjwts
+COPY display-token.html /etc/nakedjwts/
 WORKDIR /
-ENTRYPOINT ["./nakedjwt","serve","--config-dir", "/etc/nakedjwt"]
+ENTRYPOINT ["./nakedjwts","serve","--config-dir", "/etc/nakedjwts"]
 USER nobody:nobody

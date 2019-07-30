@@ -16,7 +16,7 @@ type OauthFlowConfig struct {
 	Oauth2            *oauth2.Config
 	ClientCallbackUrl *url.URL
 	MaxLoginWindow    time.Duration
-	StateCookie       *cookies.EncryptedSetter
+	StateCookie       *cookies.Encrypted
 }
 
 
@@ -30,7 +30,7 @@ func (f *OauthFlowConfig) LoginInitHandle() http.HandlerFunc{
 
 		err := f.StateCookie.SetValue(oauthState, time.Now().Add(f.MaxLoginWindow), r.Host, w)
 		if err != nil {
-			writeErrorResponse(w,"Error writing the cookie", err, http.StatusInternalServerError )
+			writeErrorResponseOut(w,"Error writing the cookie", err, http.StatusInternalServerError )
 			return
 		}
 		http.Redirect(w,r, loginUrl,http.StatusTemporaryRedirect)
@@ -50,13 +50,13 @@ func (f *OauthFlowConfig) LoginCallbackHandle(  next http.HandlerFunc) http.Hand
 		}
 
 		if err != nil {
-			writeErrorResponse(w,"Cannot decode cookie", err, http.StatusUnauthorized )
+			writeErrorResponseOut(w,"Cannot decode cookie", err, http.StatusUnauthorized )
 			return
 		}
 
 		log.Debugf("Login oauthState: %s", oauthState)
 		if s := r.URL.Query().Get("state"); s != oauthState {
-			writeErrorResponse(w,"Invalid oauthState", errors.New(s), http.StatusUnauthorized )
+			writeErrorResponseOut(w,"Invalid oauthState", errors.New(s), http.StatusUnauthorized )
 			return
 		}
 
@@ -65,7 +65,7 @@ func (f *OauthFlowConfig) LoginCallbackHandle(  next http.HandlerFunc) http.Hand
 		ctx := context.Background()
 		token, err := f.Oauth2.Exchange(ctx, code)
 		if err != nil {
-			writeErrorResponse(w,"Auth token exchange error", err, http.StatusServiceUnavailable )
+			writeErrorResponseOut(w,"Auth token exchange error", err, http.StatusServiceUnavailable )
 			return
 		}
 
@@ -73,7 +73,7 @@ func (f *OauthFlowConfig) LoginCallbackHandle(  next http.HandlerFunc) http.Hand
 		log.Debug("Got identity token from login: %s" , token)
 		err = f.StateCookie.SetValue(token.AccessToken, time.Now().Add(2 * time.Second) , r.Host, w )
 		if err != nil {
-			writeErrorResponse(w,"Failed to set cookie",err,http.StatusInternalServerError)
+			writeErrorResponseOut(w,"Failed to set cookie",err,http.StatusInternalServerError)
 			return
 		}
 

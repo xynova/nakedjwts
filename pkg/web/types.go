@@ -39,4 +39,6 @@ type pageData struct {
 	AccessToken string
 	SurrogateToken string
 	SurrogateExpires time.Time
+	EmailClaim string
+	NameClaim string
 }
