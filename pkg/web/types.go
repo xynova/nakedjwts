@@ -19,20 +19,21 @@ type StateCookieConfig struct {
 	Path 	string
 }
 
-
-type surrogateJwtClaims struct {
-	*jwt.Claims
-	Email string   	`json:"email,omitempty"`
-	Name string   	`json:"name,omitempty"`
-}
-
-
 type identityClaims struct {
 	*jwt.Claims
 	Upn string 	`json:"upn,omitempty"`
 	Email string 	`json:"email,omitempty"`
 	Name string 	`json:"name,omitempty"`
 }
+
+type SurrogateJwtClaims struct {
+	*jwt.Claims
+	Email string   	`json:"email,omitempty"`
+	Name string   	`json:"name,omitempty"`
+}
+
+
+
 
 
 type pageData struct {

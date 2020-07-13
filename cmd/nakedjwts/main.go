@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/xynova/nakedjwts/pkg/cookies"
+	"github.com/xynova/nakedjwts/pkg/localization"
 	"github.com/xynova/nakedjwts/pkg/web"
 	"golang.org/x/oauth2"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -12,11 +13,13 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"time"
 )
 
 
 var(
 	configDirFlagName = "config-dir"
+	timezoneFlagName = "timezone"
 )
 
 func main() {
@@ -24,9 +27,67 @@ func main() {
 	app := kingpin.New("nakedjwts", "Serve bare oauth tokens directly to users.")
 	configureGlobalFlags(app)
 	configureServeCommand(app)
+	configureIssueCommand(app)
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
 
+func configureIssueCommand(app *kingpin.Application) {
+	// Serve command
+	issueCmd := app.Command("issue", "Issue a detached token.")
+
+	surrogateKeyPath := issueCmd.Flag("surrogate-rsa","RSA key to sign the surrogate token").Default("ignore.private.pem").ExistingFile()
+	surrogateAudiences := issueCmd.Flag("surrogate-audience","Audiences stamped onto  the surrogate token").Required().Strings()
+	surrogateIssuerUrl :=issueCmd.Flag("surrogate-issuer","Issuer stamped onto the surrogate token").Required().URL()
+
+	nameClaim := issueCmd.Flag("name-claim","Name claim issued on surrogate token").Required().String()
+	emailClaim := issueCmd.Flag("email-claim","Email claim issued on surrogate token").Required().String()
+
+	timezone := app.GetFlag(timezoneFlagName).String()
+	configDir := app.GetFlag(configDirFlagName).Default(".").ExistingDir()
+
+	issueCmd.Action(func (c *kingpin.ParseContext) error{
+
+		var (
+			err   error
+		)
+
+		privateKey, err := web.ReadRsaPrivateKey(*surrogateKeyPath)
+		if err != nil {
+			return err
+		}
+
+		// Configure surrogate token funcs
+		signingFlow := &web.SigningFlowConfig{
+			SigningAlgorithm: jose.RS256,
+			PrivateKey:       privateKey,
+			KeyId:            "local-default",
+			Audiences:        *surrogateAudiences,
+			Issuer:           *surrogateIssuerUrl,
+			ConfigDir:        *configDir,
+		}
+
+
+		// Get expiry
+		today, err := localization.NewLocalTime(*timezone, true)
+		if err != nil {
+			return err
+		}
+		// add 7 days
+		expires := today.Add(time.Hour * 168)
+
+
+		// create token
+		token, err := signingFlow.IssueSurrogateToken(expires,*nameClaim, *emailClaim, *emailClaim)
+		if err != nil {
+			return err
+		}
+
+		os.Stdout.WriteString(token)
+
+		return nil
+	})
+
+}
 
 func configureServeCommand(app *kingpin.Application) {
 
@@ -45,6 +106,7 @@ func configureServeCommand(app *kingpin.Application) {
 	surrogateAudiences := serveCmd.Flag("surrogate-audience","Audiences stamped onto  the surrogate token").Required().Strings()
 	surrogateIssuerUrl :=serveCmd.Flag("surrogate-issuer","Issuer stamped onto the surrogate token").Required().URL()
 
+	timezone := app.GetFlag(timezoneFlagName).String()
 	configDir := app.GetFlag(configDirFlagName).Default(".").ExistingDir()
 
 
@@ -116,7 +178,14 @@ func configureServeCommand(app *kingpin.Application) {
 		router.HandleFunc(oauthFlow.ClientCallbackUrl.Path, hFunc).Methods("GET")
 
 		// Generates surrogate token
-		hFunc =  signingFlow.RenderSurrogateJwtHandle()
+		expiryCalcFunc := func() (time.Time, error) {
+			today, err := localization.NewLocalTime(*timezone, true)
+			if err != nil {
+				return time.Now(),err
+			}
+			return today.BeginningOfNextMonth(), nil
+		}
+		hFunc =  signingFlow.RenderSurrogateJwtHandle(expiryCalcFunc)
 		router.HandleFunc(displayTokenPath, hFunc).Methods("GET")
 
 		// Displays the jwks public key for the surrogate token validation
@@ -139,6 +208,7 @@ func configureServeCommand(app *kingpin.Application) {
 func configureGlobalFlags(app *kingpin.Application){
 	doDebug := app.Flag("debug", "Enable debug logs").Default("false").Bool()
 	app.Flag(configDirFlagName,"Configuration directory").Default(".").ExistingDir()
+	app.Flag( timezoneFlagName, "Timezone").Default("Australia/Sydney").String()
 
 
 	// Log as JSON instead of the default ASCII formatter.
