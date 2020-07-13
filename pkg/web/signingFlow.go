@@ -28,17 +28,51 @@ type SigningFlowConfig struct{
 	Issuer           *url.URL
 	ConfigDir        string
 	StateCookie      *cookies.Encrypted
-
 }
 
 
+// Creates a Surrogate token from parameters
+func (f *SigningFlowConfig) IssueSurrogateToken( expires time.Time, name, email, subject string) (string, error){
+	key := jose.SigningKey{Algorithm: f.SigningAlgorithm, Key: f.PrivateKey}
+	signerOpts := jose.SignerOptions{}
+	signerOpts.WithType("JWT")
+	signerOpts.WithHeader("kid" , f.KeyId)
+	signerOpts.WithHeader("x5t", "TODO: set md5 of the key")
+
+	rsaSigner, err := jose.NewSigner(key, &signerOpts)
+	if err != nil {
+		return "", errorFrom(err,"Failed to create signer" )
+	}
+
+	customClaims := &SurrogateJwtClaims{
+		Claims: &jwt.Claims{
+			//ID:       "id1",
+			Issuer:   strings.TrimSuffix(f.Issuer.String(),"/") + "/",
+			Audience: jwt.Audience(f.Audiences),
+			Subject:  subject,
+			IssuedAt: jwt.NewNumericDate(time.Now().UTC()),
+			Expiry: jwt.NewNumericDate(expires),
+		},
+		Email: email,
+		Name: name,
+	}
+
+	rt, err := jwt.Signed(rsaSigner).Claims(customClaims).CompactSerialize()
+	if err != nil {
+		return "", errorFrom(err, "Failed to create JWT")
+	}
+
+	return rt, nil
+}
 
 
-func (f *SigningFlowConfig) RenderSurrogateJwtHandle() http.HandlerFunc {
+// Renders a Surrogate token from data stored within an http cookie
+func (f *SigningFlowConfig) RenderSurrogateJwtHandle(expiryCalculator func()(time.Time, error)) http.HandlerFunc {
 
 	return func (w http.ResponseWriter, r *http.Request) {
 
 
+		// Get identity token stored in a web cookie
 		accessToken,err := f.StateCookie.GetValue(r)
 
 		if err == cookies.CookieNotFoundError {
@@ -54,14 +88,6 @@ func (f *SigningFlowConfig) RenderSurrogateJwtHandle() http.HandlerFunc {
 
 		log.Debugf("accessToken from cookie: %s", accessToken)
 
-
-		expires, err := BeginningOfMonth("Australia/Sydney")
-		expires = time.Date(expires.Year(), expires.Month() + 1 , expires.Day(), 0,0,0,0, expires.Location())
-		if err != nil {
-			writeErrorResponseOut(w, "Failed to parse timezone", err, http.StatusInternalServerError)
-			return
-		}
-
 		claims, err := parseIdentityClaimsFromToken(accessToken)
 		if err != nil {
 			writeErrorResponseOut(w, "Failed to get claims", err, http.StatusInternalServerError)
@@ -70,7 +96,14 @@ func (f *SigningFlowConfig) RenderSurrogateJwtHandle() http.HandlerFunc {
 		log.Debugf("Parent decoded claims", claims)
 
 
-		surrogateToken, err := createSurrogateToken(f,claims,expires)
+		// Create surrogate token
+		expires, err := expiryCalculator()
+		if err != nil {
+			writeErrorResponseOut(w, "Failed to parse timezone", err, http.StatusInternalServerError)
+			return
+		}
+
+		surrogateToken, err := f.IssueSurrogateToken(expires,claims.Name,claims.Email,claims.Subject)
 		if err != nil {
 			writeErrorResponseOut(w, "Failed to create JWT", err, http.StatusInternalServerError)
 			return
@@ -96,7 +129,7 @@ func (f *SigningFlowConfig) RenderSurrogateJwtHandle() http.HandlerFunc {
 
 
 
-
+// Renders the public key to validate the issued surrogate token
 func (f *SigningFlowConfig) RenderJwksHandle() http.HandlerFunc{
 
 	return func (w http.ResponseWriter, r *http.Request) {
@@ -121,41 +154,6 @@ func (f *SigningFlowConfig) RenderJwksHandle() http.HandlerFunc{
 }
 
 
-
-
-func createSurrogateToken(flowConfig *SigningFlowConfig, claims *identityClaims, expires time.Time) (string, error){
-	key := jose.SigningKey{Algorithm: flowConfig.SigningAlgorithm, Key: flowConfig.PrivateKey}
-	signerOpts := jose.SignerOptions{}
-	signerOpts.WithType("JWT")
-	signerOpts.WithHeader("kid" , flowConfig.KeyId)
-	signerOpts.WithHeader("x5t", "TODO: set md5 of the key")
-
-	rsaSigner, err := jose.NewSigner(key, &signerOpts)
-	if err != nil {
-		return "", errorFrom(err,"Failed to create signer" )
-	}
-
-	customClaims := surrogateJwtClaims{
-		Claims: &jwt.Claims{
-			//ID:       "id1",
-			Issuer:   strings.TrimSuffix(flowConfig.Issuer.String(),"/") + "/",
-			Audience: jwt.Audience(flowConfig.Audiences),
-			Subject:  claims.Subject,
-			IssuedAt: jwt.NewNumericDate(time.Now().UTC()),
-			Expiry: jwt.NewNumericDate(expires),
-		},
-		Email: claims.Email,
-		Name: claims.Name,
-	}
-
-
-	rt, err := jwt.Signed(rsaSigner).Claims(customClaims).CompactSerialize()
-	if err != nil {
-		return "", errorFrom(err, "Failed to create JWT")
-	}
-
-	return rt, nil
-}
 
 
 func parseIdentityClaimsFromToken( jwtToken string) (*identityClaims, error){
@@ -189,16 +187,3 @@ func parseIdentityClaimsFromToken( jwtToken string) (*identityClaims, error){
 	return claims, nil
 }
 
-
-func BeginningOfMonth(tz string) (time.Time, error) {
-
-	//y, m, _ := time.Now().Date()
-	location, err:= time.LoadLocation(tz)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	t := time.Now().In(location)
-
-	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, location), nil
-}
