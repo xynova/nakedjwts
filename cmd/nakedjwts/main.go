@@ -102,7 +102,7 @@ func configureServeCommand(app *kingpin.Application) {
 	idTokenUrl := serveCmd.Flag("id-token-url","Idp oauth token endpoint").Default("http://localhost/oauth2/token").URL()
 	idLoginWindow := serveCmd.Flag("id-login-window", "Max time allowed for login to happen.").Default("30s").Duration()
 
-	surrogateKeyPath := serveCmd.Flag("surrogate-rsa","RSA key to sign the surrogate token").Default("ignore.key.priv").ExistingFile()
+	surrogateKeyPath := serveCmd.Flag("surrogate-rsa","RSA key to sign the surrogate token").Default("ignore.private.pem").ExistingFile()
 	surrogateAudiences := serveCmd.Flag("surrogate-audience","Audiences stamped onto  the surrogate token").Required().Strings()
 	surrogateIssuerUrl :=serveCmd.Flag("surrogate-issuer","Issuer stamped onto the surrogate token").Required().URL()
 
