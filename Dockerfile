@@ -11,9 +11,10 @@ RUN cd cmd/nakedjwts \
     &&  go build -o /out/nakedjwts .
 
 
-FROM gcr.io/distroless/static
-COPY --from=builder /out/nakedjwts /nakedjwts
-COPY display-token.html /etc/nakedjwts/
-WORKDIR /
-ENTRYPOINT ["./nakedjwts","serve","--config-dir", "/etc/nakedjwts"]
-USER nobody:nobody
+FROM debian:buster-slim
+RUN apt-get -y update && apt-get install -y ca-certificates
+COPY --from=builder /out/nakedjwts /usr/local/bin/nakedjwts
+COPY display-token.html /opt/nakedjwts/
+WORKDIR /opt/nakedjwts
+ENTRYPOINT ["/usr/local/bin/nakedjwts","serve"]
+USER 3453:3453
