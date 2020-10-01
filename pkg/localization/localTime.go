@@ -9,20 +9,7 @@ type LocalTime struct {
 }
 
 func NewLocalTime(tz string, resetClock bool) (*LocalTime, error){
-	location, err:= time.LoadLocation(tz)
-	if err != nil {
-		return nil, err
-	}
-
-	newTime := time.Now().In(location)
-	if resetClock {
-		time.Date(newTime.Year(), newTime.Month() , newTime.Day(), 0,0,0,0, newTime.Location())
-	}
-
-	rt := &LocalTime{
-		Time: newTime,
-	}
-	return rt, nil
+	return createLocalTimeFrom(time.Now(), tz, resetClock)
 }
 
 
@@ -32,4 +19,22 @@ func (t *LocalTime) BeginningOfMonth() time.Time {
 
 func (t *LocalTime) BeginningOfNextMonth() time.Time {
 	return t.BeginningOfMonth().AddDate(0,1,0)
+}
+
+
+func createLocalTimeFrom(t time.Time, tz string, resetClock bool) (*LocalTime, error){
+	location, err:= time.LoadLocation(tz)
+	if err != nil {
+		return nil, err
+	}
+
+	newTime := t.In(location)
+	if resetClock {
+		newTime = time.Date(newTime.Year(), newTime.Month() , newTime.Day(), 0,0,0,0, newTime.Location())
+	}
+
+	rt := &LocalTime{
+		Time: newTime,
+	}
+	return rt, nil
 }
