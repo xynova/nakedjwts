@@ -34,3 +34,34 @@ issue  --surrogate-issuer=http://localhost:5000 \
 --name-claim gitlab-deployer 
 
 ```
+
+### Testing timezone settings
+
+- Install the `faketime` utility in order to change the runtime date without affecting the OS.
+- Run a test oidc provider like keycloak
+
+```bash
+TZ=UTC /usr/local/opt/libfaketime/bin/faketime '2000-12-31 12:00:00' \
+go run cmd/nakedjwts/main.go serve \
+--timezone "Australia/Sydney" \
+--client-id test-client --client-secret 86d9ec3e-0af7-401c-b2ea-579a7dbdbf9f \
+--surrogate-audience nexus  --surrogate-issuer=http://localhost:5001 \
+--id-authorize-url=http://127.0.0.1.nip.io:8080/auth/realms/test/protocol/openid-connect/auth \
+--id-token-url=http://127.0.0.1.nip.io:8080/auth/realms/test/protocol/openid-connect/token \
+--http-port 5001 \
+--client-callback-url=http://localhost:5001/oauth2/callback
+
+```
+
+```bash
+TZ=UTC /usr/local/opt/libfaketime/bin/faketime '2000-12-31 13:00:00' \
+go run cmd/nakedjwts/main.go serve \
+--timezone "Australia/Sydney" \
+--client-id test-client --client-secret 86d9ec3e-0af7-401c-b2ea-579a7dbdbf9f \
+--surrogate-audience nexus  --surrogate-issuer=http://localhost:5001 \
+--id-authorize-url=http://127.0.0.1.nip.io:8080/auth/realms/test/protocol/openid-connect/auth \
+--id-token-url=http://127.0.0.1.nip.io:8080/auth/realms/test/protocol/openid-connect/token \
+--http-port 5001 \
+--client-callback-url=http://localhost:5001/oauth2/callback
+
+```
