@@ -8,7 +8,7 @@ COPY Gopkg.toml Gopkg.lock ./
 RUN dep ensure --vendor-only
 COPY . .
 RUN cd cmd/nakedjwts \
-    &&  go build -o /out/nakedjwts .
+    &&  go build -v -o /out/nakedjwts .
 
 
 FROM debian:buster-slim
