@@ -1,11 +1,11 @@
-FROM golang as godep
-RUN go get -u github.com/golang/dep/cmd/dep
+#FROM golang as godep
+#RUN go get -u github.com/golang/dep/cmd/dep
 
-FROM godep as builder
+FROM golang as builder
 ENV CGO_ENABLED=0
 WORKDIR /go/src/github.com/xynova/nakedjwts
-COPY Gopkg.toml Gopkg.lock ./
-RUN dep ensure --vendor-only
+# COPY Gopkg.toml Gopkg.lock ./
+# RUN dep ensure --vendor-only
 COPY . .
 RUN cd cmd/nakedjwts \
     &&  go build -v -o /out/nakedjwts .
