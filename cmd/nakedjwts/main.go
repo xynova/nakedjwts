@@ -22,6 +22,7 @@ var(
 	doDebug = app.Flag("debug", "Enable debug logs").Default("false").Bool()
 	configDir = app.Flag("config-dir","Configuration directory").Default(".").ExistingDir()
 	timezone = app.Flag( "timezone", "Timezone").Default("Australia/Sydney").String()
+	verbose *bool = &[]bool{true}[0]
 )
 
 func main() {
@@ -43,7 +44,7 @@ func configureIssueCommand(app *kingpin.Application) {
 
 	nameClaim := issueCmd.Flag("name-claim","Name claim issued on surrogate token").Required().String()
 	emailClaim := issueCmd.Flag("email-claim","Email claim issued on surrogate token").Required().String()
-
+	verbose = issueCmd.Flag("verbose","Print additional configuration info").Bool()
 
 	issueCmd.Action(func (c *kingpin.ParseContext) error{
 
@@ -224,9 +225,12 @@ func configureGlobalFlags(app *kingpin.Application){
 			log.SetLevel(log.DebugLevel)
 		}
 
-		log.Infof("Timezone: %s",*timezone)
-		log.Infof("ConfigDir: %s",*configDir)
-		log.Infof("Debug: %t",*doDebug)
+		if(*verbose){
+			log.Infof("Timezone: %s",*timezone)
+			log.Infof("ConfigDir: %s",*configDir)
+			log.Infof("Debug: %t",*doDebug)
+		}
+
 		return nil
 	})
 }
